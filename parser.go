@@ -32,21 +32,24 @@ func NewParser() *Parser {
 	return &parser
 }
 
-func (parser *Parser) checkType(t reflect.Type) {
-	if _, ok := parser.types[t]; ok {
-		panic(fmt.Errorf("type %v already registered", t.Name()))
-	}
+func (parser *Parser) isTypeLoaded(t reflect.Type) bool {
+	_, ok := parser.types[t]
+	return ok
 }
 
 func (parser *Parser) AddEnum(ent interface{}, enum *graphql.Enum) {
 	t := getType(ent)
-	parser.checkType(t)
+	if parser.isTypeLoaded(t) {
+		return
+	}
 	parser.types[t] = enum
 }
 
 func (parser *Parser) AddEnumByValues(ent interface{}, values map[string]interface{}) {
 	t := getType(ent)
-	parser.checkType(t)
+	if parser.isTypeLoaded(t) {
+		return
+	}
 	name := getName(t)
 	description := getDescription(t)
 	valuesMap := make(graphql.EnumValueConfigMap)
@@ -63,17 +66,23 @@ func (parser *Parser) AddEnumByValues(ent interface{}, values map[string]interfa
 
 func (parser *Parser) AddScalar(ent interface{}, value *graphql.Scalar) {
 	t := getType(ent)
-	parser.checkType(t)
+	if parser.isTypeLoaded(t) {
+		return
+	}
 	parser.types[t] = value
 }
 
 func (parser *Parser) ParseObject(ent interface{}) *graphql.Object {
 	t := getType(ent)
-	parser.checkType(t)
+	if parser.isTypeLoaded(t) {
+		return parser.types[t].(*graphql.Object)
+	}
 	var loadObjectType func(reflect.Type, map[reflect.Type]interface{})
 	loadObjectType = func(t reflect.Type, loading map[reflect.Type]interface{}) {
 		t = getType(t)
-		parser.checkType(t)
+		if parser.isTypeLoaded(t) {
+			return
+		}
 		fields := make(graphql.Fields)
 		if t.Kind() != reflect.Struct {
 			panic(fmt.Errorf("object type must be a struct"))
@@ -86,17 +95,17 @@ func (parser *Parser) ParseObject(ent interface{}) *graphql.Object {
 			var sliceDims int
 			var unwrapSlice func(t reflect.Type) reflect.Type
 			unwrapSlice = func(t reflect.Type) reflect.Type {
-				if fieldType.Kind() == reflect.Slice {
+				if t.Kind() == reflect.Slice {
 					sliceDims++
 					return unwrapSlice(t.Elem())
 				} else {
 					return t
 				}
 			}
-			fieldType = unwrapSlice(fieldType)
+			fieldType = getType(unwrapSlice(fieldType))
 			if _, ok := parser.types[fieldType]; !ok {
 				if fieldType.Kind() != reflect.Struct {
-					panic(fmt.Errorf("type %v not loaded or struct", fieldType.Name()))
+					panic(fmt.Errorf("type %v not struct but %v", fieldType.Name(), fieldType.Kind()))
 				}
 				if _, ok := loading[fieldType]; ok {
 					panic(fmt.Errorf("loading type %v hits a loop", fieldType.Name()))
