@@ -112,4 +112,38 @@ func TestParser(t *testing.T) {
 		assert.NotNil(t, objType)
 		assert.Equal(t, StringType, objType.Fields()["Name"].Type)
 	})
+	t.Run("can load enum", func(t *testing.T) {
+		t.Run("raw enum", func(t *testing.T) {
+			parser := NewParser()
+			type String string
+			StringEnum := graphql.NewEnum(graphql.EnumConfig{
+				Name: "String",
+				Values: graphql.EnumValueConfigMap{
+					"A": &graphql.EnumValueConfig{Value: String("a")},
+					"B": &graphql.EnumValueConfig{Value: String("b")},
+				},
+			})
+			parser.AddEnum(String(""), StringEnum)
+			type Object struct {
+				Name String
+			}
+			objType := parser.ParseObject(new(Object))
+			assert.NotNil(t, objType)
+			assert.Equal(t, StringEnum, objType.Fields()["Name"].Type)
+		})
+		t.Run("wrapped enum", func(t *testing.T) {
+			parser := NewParser()
+			type String string
+			parser.AddEnumByValues(String(""), map[string]interface{}{"A": String("a")})
+			type Object struct {
+				Name String
+			}
+			objType := parser.ParseObject(new(Object))
+			assert.NotNil(t, objType)
+			assert.IsType(t, &graphql.Enum{}, objType.Fields()["Name"].Type)
+			assert.Len(t, objType.Fields()["Name"].Type.(*graphql.Enum).Values(), 1)
+			assert.Equal(t, "A", objType.Fields()["Name"].Type.(*graphql.Enum).Values()[0].Name)
+			assert.Equal(t, String("a"), objType.Fields()["Name"].Type.(*graphql.Enum).Values()[0].Value)
+		})
+	})
 }

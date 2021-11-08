@@ -9,11 +9,13 @@ import (
 )
 
 type Parser struct {
-	types map[reflect.Type]graphql.Type
+	types  map[reflect.Type]graphql.Type
+	inputs map[reflect.Type]*graphql.ArgumentConfig
 }
 
 func NewParser() *Parser {
 	var parser Parser
+	parser.inputs = make(map[reflect.Type]*graphql.ArgumentConfig)
 	parser.types = make(map[reflect.Type]graphql.Type)
 	parser.types[reflect.TypeOf(time.Time{})] = graphql.DateTime
 	parser.types[reflect.TypeOf(false)] = graphql.Boolean
@@ -34,6 +36,11 @@ func NewParser() *Parser {
 
 func (parser *Parser) isTypeLoaded(t reflect.Type) bool {
 	_, ok := parser.types[t]
+	return ok
+}
+
+func (parser *Parser) isInputLoaded(t reflect.Type) bool {
+	_, ok := parser.inputs[t]
 	return ok
 }
 
@@ -134,4 +141,15 @@ func (parser *Parser) ParseObject(ent interface{}) *graphql.Object {
 	}
 	loadObjectType(t, make(map[reflect.Type]interface{}))
 	return parser.types[t].(*graphql.Object)
+}
+
+func (parser *Parser) GetType(t reflect.Type) graphql.Type {
+	return parser.types[t]
+}
+
+func (parser *Parser) ParseInput(ent interface{}) *graphql.ArgumentConfig {
+	t := getType(ent)
+	if !parser.isInputLoaded(t) {
+	}
+	return parser.inputs[t]
 }
