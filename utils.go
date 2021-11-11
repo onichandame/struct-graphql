@@ -54,6 +54,18 @@ func decorateFieldType(field *reflect.StructField, t graphql.Type) graphql.Type 
 	return t
 }
 
+type Defaulted interface {
+	Default() interface{}
+}
+
+func getDefault(t reflect.Type) interface{} {
+	var res interface{}
+	if def, ok := reflect.New(t).Interface().(Defaulted); ok {
+		res = def.Default()
+	}
+	return res
+}
+
 func getFieldName(field *reflect.StructField) string {
 	name := field.Name
 	tags, _ := structtag.Parse(string(field.Tag))
@@ -66,4 +78,19 @@ func getFieldName(field *reflect.StructField) string {
 		}
 	}
 	return name
+}
+
+func unwrapSlice(t reflect.Type, opts ...interface{}) (reflect.Type, int) {
+	var dim int
+	if len(opts) > 0 {
+		if d, ok := opts[0].(int); ok {
+			dim = d
+		}
+	}
+	if t.Kind() == reflect.Slice {
+		dim++
+		return unwrapSlice(t.Elem(), dim)
+	} else {
+		return t, dim
+	}
 }

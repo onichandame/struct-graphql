@@ -2,6 +2,7 @@ package structgraphql
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -9,6 +10,18 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/stretchr/testify/assert"
 )
+
+type Active bool
+
+func (*Active) Default() interface{} { return true }
+
+type Input struct {
+	ID     uint `graphql:"id,id"`
+	Active Active
+}
+
+func (*Input) Name() string        { return `input` }
+func (*Input) Description() string { return `input` }
 
 func TestParser(t *testing.T) {
 	t.Run("throws when parsing non-struct", func(t *testing.T) {
@@ -144,6 +157,48 @@ func TestParser(t *testing.T) {
 			assert.Len(t, objType.Fields()["Name"].Type.(*graphql.Enum).Values(), 1)
 			assert.Equal(t, "A", objType.Fields()["Name"].Type.(*graphql.Enum).Values()[0].Name)
 			assert.Equal(t, String("a"), objType.Fields()["Name"].Type.(*graphql.Enum).Values()[0].Value)
+		})
+	})
+	t.Run("can load inputs", func(t *testing.T) {
+		type Status string
+		type Args struct {
+			ID         uint
+			Name       string `graphql:"name"`
+			Active     Active
+			Date       *time.Time
+			Nested     *Input
+			Status     Status
+			NestedList []*Input
+		}
+		parser := NewParser()
+		parser.AddEnum(Status(""), graphql.NewEnum(graphql.EnumConfig{
+			Name:   "Status",
+			Values: graphql.EnumValueConfigMap{"Active": &graphql.EnumValueConfig{Value: "active"}, "Inactive": &graphql.EnumValueConfig{Value: "inactive"}},
+		}))
+		argsType := parser.ParseArgs(new(Args))
+		assert.NotNil(t, argsType)
+		assert.Equal(t, graphql.Int, argsType["ID"].Type)
+		assert.Equal(t, graphql.String, argsType["name"].Type)
+		assert.Equal(t, graphql.Boolean, argsType["Active"].Type)
+		assert.Equal(t, true, argsType["Active"].DefaultValue)
+		assert.Equal(t, graphql.DateTime, argsType["Date"].Type)
+		assert.Equal(t, parser.inputs[reflect.TypeOf(Status(""))], argsType["Status"].Type)
+		assert.IsType(t, &graphql.InputObject{}, argsType["Nested"].Type)
+		nested := argsType["Nested"].Type.(*graphql.InputObject)
+		assert.Equal(t, `input`, nested.Name())
+		assert.Equal(t, `input`, nested.Description())
+		assert.NotNil(t, nested.Fields())
+		nestedField := nested.Fields()
+		assert.Equal(t, graphql.ID, nestedField["id"].Type)
+		assert.Equal(t, graphql.Boolean, nestedField["Active"].Type)
+		assert.Equal(t, true, nestedField["Active"].DefaultValue)
+		assert.IsType(t, graphql.NewList(&graphql.InputObject{}), argsType["NestedList"].Type)
+		t.Run("throws when circular dependency", func(t *testing.T) {
+			type Args struct {
+				Args *Args
+			}
+			parser := NewParser()
+			assert.Panics(t, func() { parser.ParseArgs(new(Args)) })
 		})
 	})
 }

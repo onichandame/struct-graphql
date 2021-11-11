@@ -10,12 +10,12 @@ import (
 
 type Parser struct {
 	types  map[reflect.Type]graphql.Type
-	inputs map[reflect.Type]*graphql.ArgumentConfig
+	inputs map[reflect.Type]graphql.Input
 }
 
 func NewParser() *Parser {
 	var parser Parser
-	parser.inputs = make(map[reflect.Type]*graphql.ArgumentConfig)
+	parser.inputs = make(map[reflect.Type]graphql.Input)
 	parser.types = make(map[reflect.Type]graphql.Type)
 	parser.types[reflect.TypeOf(time.Time{})] = graphql.DateTime
 	parser.types[reflect.TypeOf(false)] = graphql.Boolean
@@ -50,6 +50,7 @@ func (parser *Parser) AddEnum(ent interface{}, enum *graphql.Enum) {
 		return
 	}
 	parser.types[t] = enum
+	parser.inputs[t] = enum
 }
 
 func (parser *Parser) AddEnumByValues(ent interface{}, values map[string]interface{}) {
@@ -69,6 +70,7 @@ func (parser *Parser) AddEnumByValues(ent interface{}, values map[string]interfa
 		Values:      valuesMap,
 	})
 	parser.types[t] = enum
+	parser.inputs[t] = enum
 }
 
 func (parser *Parser) AddScalar(ent interface{}, value *graphql.Scalar) {
@@ -77,6 +79,15 @@ func (parser *Parser) AddScalar(ent interface{}, value *graphql.Scalar) {
 		return
 	}
 	parser.types[t] = value
+	parser.inputs[t] = value
+}
+
+func (parser *Parser) GetInputType(t reflect.Type) graphql.Type {
+	return parser.inputs[t]
+}
+
+func (parser *Parser) GetType(t reflect.Type) graphql.Type {
+	return parser.types[t]
 }
 
 func (parser *Parser) ParseObject(ent interface{}) *graphql.Object {
@@ -100,16 +111,8 @@ func (parser *Parser) ParseObject(ent interface{}) *graphql.Object {
 			name := getFieldName(&field)
 			description := getDescription(fieldType)
 			var sliceDims int
-			var unwrapSlice func(t reflect.Type) reflect.Type
-			unwrapSlice = func(t reflect.Type) reflect.Type {
-				if t.Kind() == reflect.Slice {
-					sliceDims++
-					return unwrapSlice(t.Elem())
-				} else {
-					return t
-				}
-			}
-			fieldType = getType(unwrapSlice(fieldType))
+			elemType, sliceDims := unwrapSlice(fieldType)
+			fieldType = getType(elemType)
 			if _, ok := parser.types[fieldType]; !ok {
 				if fieldType.Kind() != reflect.Struct {
 					panic(fmt.Errorf("type %v not struct but %v", fieldType.Name(), fieldType.Kind()))
@@ -143,13 +146,82 @@ func (parser *Parser) ParseObject(ent interface{}) *graphql.Object {
 	return parser.types[t].(*graphql.Object)
 }
 
-func (parser *Parser) GetType(t reflect.Type) graphql.Type {
-	return parser.types[t]
-}
-
-func (parser *Parser) ParseInput(ent interface{}) *graphql.ArgumentConfig {
+// parse all args as a struct
+func (parser *Parser) ParseArgs(ent interface{}) graphql.FieldConfigArgument {
 	t := getType(ent)
-	if !parser.isInputLoaded(t) {
+	if t.Kind() != reflect.Struct {
+		panic(fmt.Errorf("args must be passed as a struct"))
 	}
-	return parser.inputs[t]
+	var loadInput func(t reflect.Type, loading map[reflect.Type]interface{})
+	loadInput = func(t reflect.Type, loading map[reflect.Type]interface{}) {
+		t = getType(t)
+		if _, ok := loading[t]; ok {
+			panic(fmt.Errorf("arg type %v hits circular dependency", t.Name()))
+		}
+		if !parser.isInputLoaded(t) {
+			switch t.Kind() {
+			case reflect.String:
+				parser.inputs[t] = graphql.String
+			case reflect.Float32, reflect.Float64:
+				parser.inputs[t] = graphql.Float
+			case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8, reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8:
+				parser.inputs[t] = graphql.Int
+			case reflect.Bool:
+				parser.inputs[t] = graphql.Boolean
+			case reflect.Struct:
+				if t == reflect.TypeOf(time.Time{}) {
+					parser.inputs[t] = graphql.DateTime
+				} else {
+					fields := make(graphql.InputObjectConfigFieldMap)
+					for i := 0; i < t.NumField(); i++ {
+						field := t.Field(i)
+						fieldType := getType(field.Type)
+						fieldType, sliceDims := unwrapSlice(fieldType)
+						newLoading := make(map[reflect.Type]interface{}, 0)
+						for k, v := range loading {
+							newLoading[k] = v
+						}
+						newLoading[t] = nil
+						loadInput(fieldType, newLoading)
+						inputfieldtype := parser.inputs[fieldType]
+						for i := 0; i < sliceDims; i++ {
+							inputfieldtype = graphql.NewList(inputfieldtype)
+						}
+						inputfieldtype = decorateFieldType(&field, inputfieldtype)
+						fields[getFieldName(&field)] = &graphql.InputObjectFieldConfig{
+							Type:         inputfieldtype,
+							DefaultValue: getDefault(getType(fieldType)),
+						}
+					}
+					parser.inputs[t] = graphql.NewInputObject(graphql.InputObjectConfig{
+						Name:        getName(t),
+						Description: getDescription(t),
+						Fields:      fields,
+					})
+				}
+			default:
+				panic(fmt.Errorf("kind %v not supported in inputs", t.Kind()))
+			}
+		}
+	}
+	args := make(graphql.FieldConfigArgument)
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldType := getType(field.Type)
+		fieldType, sliceDims := unwrapSlice(fieldType)
+		loadInput(fieldType, make(map[reflect.Type]interface{}))
+		name := getFieldName(&field)
+		description := getDescription(t)
+		argType := parser.inputs[fieldType]
+		for i := 0; i < sliceDims; i++ {
+			argType = graphql.NewList(argType)
+		}
+		argType = decorateFieldType(&field, argType)
+		args[name] = &graphql.ArgumentConfig{
+			Type:         argType,
+			Description:  description,
+			DefaultValue: getDefault(fieldType),
+		}
+	}
+	return args
 }
