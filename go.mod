@@ -1,4 +1,4 @@
-module github.com/onichandame/structgraphql
+module github.com/onichandame/struct-graphql
 
 go 1.17
 
