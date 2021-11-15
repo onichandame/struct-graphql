@@ -43,10 +43,7 @@ func decorateFieldType(field *reflect.StructField, t graphql.Type) graphql.Type 
 	if tags != nil {
 		tag, _ := tags.Get(TAG_PREFIX)
 		if tag != nil {
-			if tag.HasOption(TAG_ID) {
-				t = graphql.ID
-			}
-			if tag.HasOption(TAG_NULLABLE) {
+			if !tag.HasOption(TAG_NULLABLE) {
 				t = graphql.NewNonNull(t)
 			}
 		}
@@ -92,5 +89,18 @@ func unwrapSlice(t reflect.Type, opts ...interface{}) (reflect.Type, int) {
 		return unwrapSlice(t.Elem(), dim)
 	} else {
 		return t, dim
+	}
+}
+
+type ID interface {
+	ID() bool
+}
+
+func isID(t reflect.Type) bool {
+	ent := reflect.New(t).Interface()
+	if id, ok := ent.(ID); ok {
+		return id.ID()
+	} else {
+		return false
 	}
 }
