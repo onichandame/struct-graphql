@@ -178,6 +178,9 @@ func (parser *Parser) ParseInput(ent interface{}, opts ...interface{}) graphql.I
 				visited = v
 			}
 		}
+		if _, ok := visited[t]; ok {
+			panic(fmt.Errorf("when loading input type there must not be a cyclic reference at %v", t.Name()))
+		}
 		visited[t] = nil
 		if t.Kind() == reflect.Struct && t != reflect.TypeOf(time.Time{}) {
 			fields := make(graphql.InputObjectConfigFieldMap)
@@ -191,17 +194,17 @@ func (parser *Parser) ParseInput(ent interface{}, opts ...interface{}) graphql.I
 				var sliceDims int
 				elemType, sliceDims := unwrapSlice(fieldType)
 				fieldType = getType(elemType)
-				var t graphql.Type
-				if ft, ok := parser.types[fieldType]; !ok {
-					t = parser.ParseOutput(reflect.New(fieldType), visited)
+				var fieldtype graphql.Type
+				if ft, ok := parser.inputs[fieldType]; !ok {
+					fieldtype = parser.ParseInput(fieldType, visited)
 				} else {
-					t = ft
+					fieldtype = ft
 				}
 				for dim := 0; dim < sliceDims; dim++ {
-					t = graphql.NewList(t)
+					fieldtype = graphql.NewList(fieldtype)
 				}
-				t = decorateFieldType(&field, t)
-				fields[name] = &graphql.InputObjectFieldConfig{Type: t, Description: getDescription(fieldType), DefaultValue: getDefault(fieldType)}
+				fieldtype = decorateFieldType(&field, fieldtype)
+				fields[name] = &graphql.InputObjectFieldConfig{Type: fieldtype, Description: getDescription(fieldType), DefaultValue: getDefault(fieldType)}
 			}
 			parser.inputs[t] = graphql.NewInputObject(graphql.InputObjectConfig{
 				Name:        getName(t),

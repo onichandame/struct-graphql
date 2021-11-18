@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/graphql-go/graphql"
-	structgraphql "github.com/onichandame/struct-graphql"
+	structgraphql "github.com/onichandame/structgraphql"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -117,6 +117,71 @@ func TestParser(t *testing.T) {
 				strType := parser.ParseInput(Str(""))
 				assert.NotNil(t, strType)
 				assert.Equal(t, Str("").Name(), strType.Name())
+			})
+			t.Run("int", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				rawType := parser.ParseInput(int16(0))
+				assert.NotNil(t, rawType)
+				intType := parser.ParseInput(Int(0))
+				assert.NotNil(t, intType)
+				assert.Equal(t, Int(0).Description(), intType.Description())
+			})
+			t.Run("bool", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				rawType := parser.ParseInput(false)
+				assert.NotNil(t, rawType)
+				type Bool bool
+				boolType := parser.ParseInput(Bool(true))
+				assert.NotNil(t, boolType)
+			})
+			t.Run("date", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				rawType := parser.ParseInput(new(time.Time))
+				assert.NotNil(t, rawType)
+				type Date *time.Time
+				dateType := parser.ParseInput(new(Date))
+				assert.NotNil(t, dateType)
+			})
+		})
+		t.Run("can parse objects", func(t *testing.T) {
+			t.Run("throws when circular dependency", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				type Input struct {
+					Input *Input
+				}
+				assert.Panics(t, func() { parser.ParseInput(new(Input)) })
+			})
+			t.Run("plain object", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				type Input struct {
+					ID   ID         `graphql:"id"`
+					Str  Str        `graphql:"str"`
+					Bool bool       `graphql:"bool"`
+					Date *time.Time `graphql:"date"`
+				}
+				inputType := parser.ParseInput(new(Input))
+				assert.NotNil(t, inputType)
+				assert.IsType(t, new(graphql.InputObject), inputType)
+				input := inputType.(*graphql.InputObject)
+				assert.NotNil(t, input.Fields()["id"])
+			})
+			t.Run("nested object", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				type Child struct {
+					ID uint `graphql:"id"`
+				}
+				type Input struct {
+					Children []*Child `graphql:"children,nullable"`
+				}
+				inputType := parser.ParseInput(new(Input))
+				assert.NotNil(t, inputType)
+				assert.IsType(t, new(graphql.InputObject), inputType)
+				input := inputType.(*graphql.InputObject)
+				assert.NotNil(t, input.Fields()["children"])
+				assert.IsType(t, new(graphql.List), input.Fields()["children"].Type)
+				children := input.Fields()["children"].Type.(*graphql.List).OfType
+				assert.IsType(t, new(graphql.InputObject), children)
+				assert.IsType(t, new(graphql.NonNull), children.(*graphql.InputObject).Fields()["id"].Type)
 			})
 		})
 	})
