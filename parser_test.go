@@ -1,11 +1,14 @@
 package structgraphql_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/graphql-go/graphql"
-	structgraphql "github.com/onichandame/structgraphql"
+	goutils "github.com/onichandame/go-utils"
+	structgraphql "github.com/onichandame/struct-graphql"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -185,149 +188,96 @@ func TestParser(t *testing.T) {
 			})
 		})
 	})
-	//t.Run("can parse nested object", func(t *testing.T) {
-	//	parser := NewParser()
-	//	type GrandChild struct {
-	//		ID uint `graphql:",id"`
-	//	}
-	//	type Child struct {
-	//		ID        uint
-	//		Offspring *GrandChild
-	//	}
-	//	type Parent struct {
-	//		ID        uint
-	//		Offspring []*Child
-	//	}
-	//	objType := parser.ParseOutput(new(Parent))
-	//	assert.NotNil(t, objType)
-	//	assert.IsType(t, &graphql.List{}, objType.Fields()["Offspring"].Type)
-	//	assert.IsType(t, &graphql.Object{}, objType.Fields()["Offspring"].Type.(*graphql.List).OfType)
-	//	assert.IsType(t, &graphql.Object{}, objType.Fields()["Offspring"].Type.(*graphql.List).OfType.(*graphql.Object).Fields()["Offspring"].Type)
-	//	assert.IsType(t, graphql.ID, objType.Fields()["Offspring"].Type.(*graphql.List).OfType.(*graphql.Object).Fields()["Offspring"].Type.(*graphql.Object).Fields()["ID"].Type)
-	//})
-	//t.Run("can double load object", func(t *testing.T) {
-	//	parser := NewParser()
-	//	type Object struct{}
-	//	assert.NotPanics(t, func() {
-	//		parser.ParseOutput(new(Object))
-	//		parser.ParseOutput(new(Object))
-	//	})
-	//})
-	//t.Run("can load scalar", func(t *testing.T) {
-	//	parser := NewParser()
-	//	type String string
-	//	StringType := graphql.NewScalar(graphql.ScalarConfig{
-	//		Name:        "String",
-	//		Description: "String",
-	//		Serialize: func(value interface{}) interface{} {
-	//			switch value := value.(type) {
-	//			case String, string:
-	//				return value
-	//			default:
-	//				panic(fmt.Errorf("type must be String"))
-	//			}
-	//		},
-	//		ParseValue: func(value interface{}) interface{} {
-	//			switch value := value.(type) {
-	//			case String:
-	//				return value
-	//			case string:
-	//				return String(value)
-	//			default:
-	//				panic(fmt.Errorf("type must be string"))
-	//			}
-	//		},
-	//		ParseLiteral: func(valueAST ast.Value) interface{} {
-	//			switch value := valueAST.(type) {
-	//			case *ast.StringValue:
-	//				return String(value.Value)
-	//			default:
-	//				panic(fmt.Errorf("type must be string"))
-	//			}
-	//		},
-	//	})
-	//	parser.AddScalar(String(""), StringType)
-	//	type Object struct {
-	//		Name String
-	//	}
-	//	objType := parser.ParseOutput(new(Object))
-	//	assert.NotNil(t, objType)
-	//	assert.Equal(t, StringType, objType.Fields()["Name"].Type)
-	//})
-	//t.Run("can load enum", func(t *testing.T) {
-	//	t.Run("raw enum", func(t *testing.T) {
-	//		parser := NewParser()
-	//		type String string
-	//		StringEnum := graphql.NewEnum(graphql.EnumConfig{
-	//			Name: "String",
-	//			Values: graphql.EnumValueConfigMap{
-	//				"A": &graphql.EnumValueConfig{Value: String("a")},
-	//				"B": &graphql.EnumValueConfig{Value: String("b")},
-	//			},
-	//		})
-	//		parser.AddEnum(String(""), StringEnum)
-	//		type Object struct {
-	//			Name String
-	//		}
-	//		objType := parser.ParseOutput(new(Object))
-	//		assert.NotNil(t, objType)
-	//		assert.Equal(t, StringEnum, objType.Fields()["Name"].Type)
-	//	})
-	//	t.Run("wrapped enum", func(t *testing.T) {
-	//		parser := NewParser()
-	//		type String string
-	//		parser.AddEnumByValues(String(""), map[string]interface{}{"A": String("a")})
-	//		type Object struct {
-	//			Name String
-	//		}
-	//		objType := parser.ParseOutput(new(Object))
-	//		assert.NotNil(t, objType)
-	//		assert.IsType(t, &graphql.Enum{}, objType.Fields()["Name"].Type)
-	//		assert.Len(t, objType.Fields()["Name"].Type.(*graphql.Enum).Values(), 1)
-	//		assert.Equal(t, "A", objType.Fields()["Name"].Type.(*graphql.Enum).Values()[0].Name)
-	//		assert.Equal(t, String("a"), objType.Fields()["Name"].Type.(*graphql.Enum).Values()[0].Value)
-	//	})
-	//})
-	//t.Run("can load inputs", func(t *testing.T) {
-	//	type Status string
-	//	type Args struct {
-	//		ID         uint
-	//		Name       string `graphql:"name"`
-	//		Active     Active
-	//		Date       *time.Time
-	//		Nested     *Input
-	//		Status     Status
-	//		NestedList []*Input
-	//	}
-	//	parser := NewParser()
-	//	parser.AddEnum(Status(""), graphql.NewEnum(graphql.EnumConfig{
-	//		Name:   "Status",
-	//		Values: graphql.EnumValueConfigMap{"Active": &graphql.EnumValueConfig{Value: "active"}, "Inactive": &graphql.EnumValueConfig{Value: "inactive"}},
-	//	}))
-	//	argsType := parser.ParseArgs(new(Args))
-	//	assert.NotNil(t, argsType)
-	//	assert.Equal(t, graphql.Int, argsType["ID"].Type)
-	//	assert.Equal(t, graphql.String, argsType["name"].Type)
-	//	assert.Equal(t, graphql.Boolean, argsType["Active"].Type)
-	//	assert.Equal(t, true, argsType["Active"].DefaultValue)
-	//	assert.Equal(t, graphql.DateTime, argsType["Date"].Type)
-	//	assert.Equal(t, parser.inputs[reflect.TypeOf(Status(""))], argsType["Status"].Type)
-	//	assert.IsType(t, &graphql.InputObject{}, argsType["Nested"].Type)
-	//	nested := argsType["Nested"].Type.(*graphql.InputObject)
-	//	assert.Equal(t, `input`, nested.Name())
-	//	assert.Equal(t, `input`, nested.Description())
-	//	assert.NotNil(t, nested.Fields())
-	//	nestedField := nested.Fields()
-	//	assert.Equal(t, graphql.ID, nestedField["id"].Type)
-	//	assert.Equal(t, graphql.Boolean, nestedField["Active"].Type)
-	//	assert.Equal(t, true, nestedField["Active"].DefaultValue)
-	//	assert.IsType(t, graphql.NewList(&graphql.InputObject{}), argsType["NestedList"].Type)
-	//	t.Run("throws when circular dependency", func(t *testing.T) {
-	//		type Args struct {
-	//			Args *Args
-	//		}
-	//		parser := NewParser()
-	//		assert.Panics(t, func() { parser.ParseArgs(new(Args)) })
-	//	})
-	//})
+	t.Run("args", func(t *testing.T) {
+		t.Run("throws when passed non-struct", func(t *testing.T) {
+			parser := structgraphql.NewParser()
+			assert.Panics(t, func() { parser.ParseArgs("") })
+			assert.Panics(t, func() { parser.ParseArgs(0) })
+			assert.Panics(t, func() { parser.ParseArgs(true) })
+			assert.Panics(t, func() { parser.ParseArgs(map[interface{}]interface{}{}) })
+			assert.Panics(t, func() { parser.ParseArgs([]interface{}{}) })
+		})
+		t.Run("primitives", func(t *testing.T) {
+			parser := structgraphql.NewParser()
+			type Args struct {
+				ID     uint       `graphql:"id,nullable"`
+				Name   string     `graphql:"name,nullable"`
+				Active bool       `graphql:"active"`
+				Date   *time.Time `graphql:"date,nullable"`
+			}
+			argsType := parser.ParseArgs(new(Args))
+			assert.NotNil(t, argsType)
+			assert.NotNil(t, argsType["id"])
+			assert.NotNil(t, argsType["name"])
+			assert.NotNil(t, argsType["active"])
+			assert.IsType(t, new(graphql.NonNull), argsType["active"].Type)
+			assert.NotNil(t, argsType["date"])
+		})
+		t.Run("nested objects", func(t *testing.T) {
+			parser := structgraphql.NewParser()
+			type Input struct {
+				ID uint `graphql:"id"`
+			}
+			type Args struct {
+				Input *Input `graphql:"input,nullable"`
+			}
+			argsType := parser.ParseArgs(new(Args))
+			assert.NotNil(t, argsType)
+			assert.NotNil(t, argsType["input"])
+			assert.IsType(t, new(graphql.InputObject), argsType["input"].Type)
+			input := argsType["input"].Type.(*graphql.InputObject)
+			assert.NotNil(t, input.Fields()["id"])
+			assert.IsType(t, new(graphql.NonNull), input.Fields()["id"].Type)
+		})
+	})
+	t.Run("end-to-end", func(t *testing.T) {
+		parser := structgraphql.NewParser()
+		type Input struct {
+			Name Str `graphql:"name"`
+		}
+		type Args struct {
+			Input   *Input `graphql:"input"`
+			Message string `graphql:"message"`
+		}
+		type Output struct {
+			Name     string `graphql:"name" json:"name"`
+			Message  string `graphql:"message" json:"message"`
+			Greeting string `graphql:"greeting" json:"greeting"`
+		}
+		schema, err := graphql.NewSchema(graphql.SchemaConfig{
+			Query: graphql.NewObject(graphql.ObjectConfig{
+				Name: "query",
+				Fields: graphql.Fields{
+					"handshake": &graphql.Field{
+						Args: parser.ParseArgs(new(Args)),
+						Type: parser.ParseOutput(new(Output)),
+						Resolve: func(p graphql.ResolveParams) (res interface{}, err error) {
+							defer goutils.RecoverToErr(&err)
+							var out Output
+							out.Name = p.Args["input"].(map[string]interface{})["name"].(string)
+							out.Message = p.Args["message"].(string)
+							out.Greeting = fmt.Sprintf("hello %v", out.Name)
+							res = &out
+							return res, err
+						},
+					},
+				},
+			}),
+		})
+		assert.Nil(t, err)
+		res := graphql.Do(graphql.Params{
+			Schema:        schema,
+			RequestString: `{handshake(input:{name:"jimmy"},message:"hi"){name message greeting}}`,
+		})
+		assert.Nil(t, res.Errors)
+		by, err := json.Marshal(res.Data)
+		assert.Nil(t, err)
+		type Response struct {
+			Handshake Output `json:"handshake"`
+		}
+		var out Response
+		assert.Nil(t, json.Unmarshal(by, &out))
+		assert.Equal(t, "jimmy", out.Handshake.Name)
+		assert.Equal(t, "hello jimmy", out.Handshake.Greeting)
+	})
 }
