@@ -8,24 +8,24 @@ import (
 	goutils "github.com/onichandame/go-utils"
 )
 
-type Named interface{ Name() string }
+type Named interface{ GetName() string }
 
 func getName(t reflect.Type) string {
 	t = goutils.UnwrapType(t)
 	name := t.Name()
 	if named, ok := reflect.New(t).Interface().(Named); ok {
-		name = named.Name()
+		name = named.GetName()
 	}
 	return name
 }
 
-type Described interface{ Description() string }
+type Described interface{ GetDescription() string }
 
 func getDescription(t reflect.Type) string {
 	t = goutils.UnwrapType(t)
 	description := ``
 	if described, ok := reflect.New(t).Interface().(Described); ok {
-		description = described.Description()
+		description = described.GetDescription()
 	}
 	return description
 }
@@ -52,13 +52,13 @@ func decorateFieldType(field *reflect.StructField, t graphql.Type) graphql.Type 
 }
 
 type Defaulted interface {
-	Default() interface{}
+	GetDefault() interface{}
 }
 
 func getDefault(t reflect.Type) interface{} {
 	var res interface{}
 	if def, ok := reflect.New(t).Interface().(Defaulted); ok {
-		res = def.Default()
+		res = def.GetDefault()
 	}
 	return res
 }
@@ -93,13 +93,13 @@ func unwrapSlice(t reflect.Type, opts ...interface{}) (reflect.Type, int) {
 }
 
 type ID interface {
-	ID() bool
+	IsID() bool
 }
 
 func isID(t reflect.Type) bool {
 	ent := reflect.New(t).Interface()
 	if id, ok := ent.(ID); ok {
-		return id.ID()
+		return id.IsID()
 	} else {
 		return false
 	}

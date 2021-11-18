@@ -14,16 +14,16 @@ import (
 
 type Str string
 
-func (Str) Name() string         { return `Str` }
-func (Str) Default() interface{} { return `Str` }
+func (Str) GetName() string         { return `Str` }
+func (Str) GetDefault() interface{} { return `Str` }
 
 type Int int8
 
-func (Int) Description() string { return `Int8bit` }
+func (Int) GetDescription() string { return `Int8bit` }
 
 type ID uint
 
-func (ID) ID() bool { return true }
+func (ID) IsID() bool { return true }
 func TestParser(t *testing.T) {
 	t.Run("output", func(t *testing.T) {
 		t.Run("can parse primitives", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestParser(t *testing.T) {
 				strType := parser.ParseOutput(Str(""))
 				assert.NotNil(t, strType)
 				assert.IsType(t, &graphql.Scalar{}, strType)
-				assert.Equal(t, Str("").Name(), strType.Name())
+				assert.Equal(t, Str("").GetName(), strType.Name())
 			})
 			t.Run("int", func(t *testing.T) {
 				parser := structgraphql.NewParser()
@@ -43,7 +43,7 @@ func TestParser(t *testing.T) {
 				intType := parser.ParseOutput(Int(0))
 				assert.NotNil(t, intType)
 				assert.IsType(t, new(graphql.Scalar), intType)
-				assert.Equal(t, Int(0).Description(), intType.Description())
+				assert.Equal(t, Int(0).GetDescription(), intType.Description())
 			})
 			t.Run("bool", func(t *testing.T) {
 				parser := structgraphql.NewParser()
@@ -119,7 +119,7 @@ func TestParser(t *testing.T) {
 				assert.NotNil(t, rawType)
 				strType := parser.ParseInput(Str(""))
 				assert.NotNil(t, strType)
-				assert.Equal(t, Str("").Name(), strType.Name())
+				assert.Equal(t, Str("").GetName(), strType.Name())
 			})
 			t.Run("int", func(t *testing.T) {
 				parser := structgraphql.NewParser()
@@ -127,7 +127,7 @@ func TestParser(t *testing.T) {
 				assert.NotNil(t, rawType)
 				intType := parser.ParseInput(Int(0))
 				assert.NotNil(t, intType)
-				assert.Equal(t, Int(0).Description(), intType.Description())
+				assert.Equal(t, Int(0).GetDescription(), intType.Description())
 			})
 			t.Run("bool", func(t *testing.T) {
 				parser := structgraphql.NewParser()

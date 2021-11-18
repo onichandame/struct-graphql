@@ -39,11 +39,6 @@ func (parser *Parser) isTypeLoaded(t reflect.Type) bool {
 	return ok
 }
 
-func (parser *Parser) isInputLoaded(t reflect.Type) bool {
-	_, ok := parser.inputs[t]
-	return ok
-}
-
 func (parser *Parser) AddEnum(ent interface{}, enum *graphql.Enum) {
 	t := getType(ent)
 	if parser.isTypeLoaded(t) {
@@ -80,14 +75,6 @@ func (parser *Parser) AddScalar(ent interface{}, value *graphql.Scalar) {
 	}
 	parser.types[t] = value
 	parser.inputs[t] = value
-}
-
-func (parser *Parser) GetInputType(t reflect.Type) graphql.Type {
-	return parser.inputs[t]
-}
-
-func (parser *Parser) GetType(t reflect.Type) graphql.Type {
-	return parser.types[t]
 }
 
 func (parser *Parser) ParseOutput(ent interface{}, opts ...interface{}) graphql.Type {
