@@ -116,13 +116,11 @@ func (parser *Parser) ParseOutput(ent interface{}, opts ...interface{}) graphql.
 				fieldtype = decorateFieldType(&field, fieldtype)
 				fields[name] = &graphql.Field{Type: fieldtype, Description: getDescription(fieldType), Name: getName(fieldType)}
 			}
-			objtype := graphql.NewObject(graphql.ObjectConfig{
+			parser.types[t] = graphql.NewObject(graphql.ObjectConfig{
 				Fields:      fields,
 				Name:        getName(t),
 				Description: getDescription(t),
 			})
-			f := objtype.Fields()
-			parser.types[t] = objtype
 		} else {
 			var baseType *graphql.Scalar
 			if isID(t) {
