@@ -122,7 +122,6 @@ func (parser *Parser) ParseOutput(ent interface{}, opts ...interface{}) graphql.
 				Description: getDescription(t),
 			})
 			f := objtype.Fields()
-			fmt.Print(f)
 			parser.types[t] = objtype
 		} else {
 			var baseType *graphql.Scalar
