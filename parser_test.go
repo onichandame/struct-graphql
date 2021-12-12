@@ -109,6 +109,21 @@ func TestParser(t *testing.T) {
 				assert.NotNil(t, child.Fields()["id"])
 				assert.IsType(t, new(graphql.NonNull), child.Fields()["id"].Type)
 			})
+			t.Run("anonymous fields", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				type Embedded struct {
+					Str string `graphql:"str"`
+				}
+				type Obj struct {
+					Embedded
+					Int int `graphql:"int"`
+				}
+				objType := parser.ParseOutput(new(Obj))
+				assert.NotNil(t, objType)
+				assert.IsType(t, new(graphql.Object), objType)
+				obj := objType.(*graphql.Object)
+				assert.NotNil(t, obj.Fields()["str"])
+			})
 		})
 	})
 	t.Run("input", func(t *testing.T) {
@@ -186,6 +201,20 @@ func TestParser(t *testing.T) {
 				assert.IsType(t, new(graphql.InputObject), children)
 				assert.IsType(t, new(graphql.NonNull), children.(*graphql.InputObject).Fields()["id"].Type)
 			})
+			t.Run("anonymous fields", func(t *testing.T) {
+				parser := structgraphql.NewParser()
+				type Embedded struct {
+					Str string `graphql:"str"`
+				}
+				type Obj struct {
+					Embedded
+				}
+				inputType := parser.ParseInput(new(Obj))
+				assert.NotNil(t, inputType)
+				assert.IsType(t, new(graphql.InputObject), inputType)
+				input := inputType.(*graphql.InputObject)
+				assert.NotNil(t, input.Fields()[`str`])
+			})
 		})
 	})
 	t.Run("args", func(t *testing.T) {
@@ -228,6 +257,16 @@ func TestParser(t *testing.T) {
 			input := argsType["input"].Type.(*graphql.InputObject)
 			assert.NotNil(t, input.Fields()["id"])
 			assert.IsType(t, new(graphql.NonNull), input.Fields()["id"].Type)
+		})
+		t.Run("anonymous fields", func(t *testing.T) {
+			parser := structgraphql.NewParser()
+			type Embedded struct {
+				Str string `graphql:"str"`
+			}
+			type Args struct{ Embedded }
+			argsType := parser.ParseArgs(new(Args))
+			assert.NotNil(t, argsType)
+			assert.NotNil(t, argsType[`str`])
 		})
 	})
 	t.Run("end-to-end", func(t *testing.T) {

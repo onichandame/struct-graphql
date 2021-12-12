@@ -94,28 +94,33 @@ func (parser *Parser) ParseOutput(ent interface{}, opts ...interface{}) graphql.
 		visited[t] = nil
 		if t != reflect.TypeOf(time.Time{}) && t.Kind() == reflect.Struct {
 			fields := make(graphql.Fields)
-			if t.Kind() != reflect.Struct {
-				panic(fmt.Errorf("object type must be defined as a struct"))
-			}
-			for i := 0; i < t.NumField(); i++ {
-				field := t.Field(i)
-				fieldType := getType(field.Type)
-				name := getFieldName(&field)
-				var sliceDims int
-				elemType, sliceDims := unwrapSlice(fieldType)
-				fieldType = getType(elemType)
-				var fieldtype graphql.Type
-				if ft, ok := parser.types[fieldType]; !ok {
-					fieldtype = parser.ParseOutput(fieldType, visited)
-				} else {
-					fieldtype = ft
+			var loadStruct func(t reflect.Type)
+			loadStruct = func(t reflect.Type) {
+				for i := 0; i < t.NumField(); i++ {
+					field := t.Field(i)
+					if field.Anonymous {
+						loadStruct(field.Type)
+					} else {
+						fieldType := getType(field.Type)
+						name := getFieldName(&field)
+						var sliceDims int
+						elemType, sliceDims := unwrapSlice(fieldType)
+						fieldType = getType(elemType)
+						var fieldtype graphql.Type
+						if ft, ok := parser.types[fieldType]; !ok {
+							fieldtype = parser.ParseOutput(fieldType, visited)
+						} else {
+							fieldtype = ft
+						}
+						for dim := 0; dim < sliceDims; dim++ {
+							fieldtype = graphql.NewList(fieldtype)
+						}
+						fieldtype = decorateFieldType(&field, fieldtype)
+						fields[name] = &graphql.Field{Type: fieldtype, Description: getDescription(fieldType), Name: getName(fieldType)}
+					}
 				}
-				for dim := 0; dim < sliceDims; dim++ {
-					fieldtype = graphql.NewList(fieldtype)
-				}
-				fieldtype = decorateFieldType(&field, fieldtype)
-				fields[name] = &graphql.Field{Type: fieldtype, Description: getDescription(fieldType), Name: getName(fieldType)}
 			}
+			loadStruct(t)
 			parser.types[t] = graphql.NewObject(graphql.ObjectConfig{
 				Fields:      fields,
 				Name:        getName(t),
@@ -168,28 +173,33 @@ func (parser *Parser) ParseInput(ent interface{}, opts ...interface{}) graphql.I
 		visited[t] = nil
 		if t.Kind() == reflect.Struct && t != reflect.TypeOf(time.Time{}) {
 			fields := make(graphql.InputObjectConfigFieldMap)
-			if t.Kind() != reflect.Struct {
-				panic(fmt.Errorf("object type must be defined as a struct"))
-			}
-			for i := 0; i < t.NumField(); i++ {
-				field := t.Field(i)
-				fieldType := getType(field.Type)
-				name := getFieldName(&field)
-				var sliceDims int
-				elemType, sliceDims := unwrapSlice(fieldType)
-				fieldType = getType(elemType)
-				var fieldtype graphql.Type
-				if ft, ok := parser.inputs[fieldType]; !ok {
-					fieldtype = parser.ParseInput(fieldType, visited)
-				} else {
-					fieldtype = ft
+			var loadStruct func(t reflect.Type)
+			loadStruct = func(t reflect.Type) {
+				for i := 0; i < t.NumField(); i++ {
+					field := t.Field(i)
+					if field.Anonymous {
+						loadStruct(field.Type)
+					} else {
+						fieldType := getType(field.Type)
+						name := getFieldName(&field)
+						var sliceDims int
+						elemType, sliceDims := unwrapSlice(fieldType)
+						fieldType = getType(elemType)
+						var fieldtype graphql.Type
+						if ft, ok := parser.inputs[fieldType]; !ok {
+							fieldtype = parser.ParseInput(fieldType, visited)
+						} else {
+							fieldtype = ft
+						}
+						for dim := 0; dim < sliceDims; dim++ {
+							fieldtype = graphql.NewList(fieldtype)
+						}
+						fieldtype = decorateFieldType(&field, fieldtype)
+						fields[name] = &graphql.InputObjectFieldConfig{Type: fieldtype, Description: getDescription(fieldType), DefaultValue: getDefault(fieldType)}
+					}
 				}
-				for dim := 0; dim < sliceDims; dim++ {
-					fieldtype = graphql.NewList(fieldtype)
-				}
-				fieldtype = decorateFieldType(&field, fieldtype)
-				fields[name] = &graphql.InputObjectFieldConfig{Type: fieldtype, Description: getDescription(fieldType), DefaultValue: getDefault(fieldType)}
 			}
+			loadStruct(t)
 			parser.inputs[t] = graphql.NewInputObject(graphql.InputObjectConfig{
 				Name:        getName(t),
 				Description: getDescription(t),
@@ -230,20 +240,28 @@ func (parser *Parser) ParseArgs(ent interface{}) graphql.FieldConfigArgument {
 		panic(fmt.Errorf("args must be passed as a struct"))
 	}
 	args := make(graphql.FieldConfigArgument)
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		fieldType := getType(field.Type)
-		fieldType, sliceDims := unwrapSlice(fieldType)
-		argType := parser.ParseInput(fieldType)
-		for i := 0; i < sliceDims; i++ {
-			argType = graphql.NewList(argType)
-		}
-		argType = decorateFieldType(&field, argType)
-		args[getFieldName(&field)] = &graphql.ArgumentConfig{
-			Type:         argType,
-			Description:  getDescription(fieldType),
-			DefaultValue: getDefault(fieldType),
+	var loadStruct func(t reflect.Type)
+	loadStruct = func(t reflect.Type) {
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			if field.Anonymous {
+				loadStruct(field.Type)
+			} else {
+				fieldType := getType(field.Type)
+				fieldType, sliceDims := unwrapSlice(fieldType)
+				argType := parser.ParseInput(fieldType)
+				for i := 0; i < sliceDims; i++ {
+					argType = graphql.NewList(argType)
+				}
+				argType = decorateFieldType(&field, argType)
+				args[getFieldName(&field)] = &graphql.ArgumentConfig{
+					Type:         argType,
+					Description:  getDescription(fieldType),
+					DefaultValue: getDefault(fieldType),
+				}
+			}
 		}
 	}
+	loadStruct(t)
 	return args
 }
